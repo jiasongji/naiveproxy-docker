@@ -14,8 +14,6 @@ services:
     volumes:
       - ./data:/data
       - ./share:/root/.local/share
-      # 以下是证书卷的旧配置，如果使用宿主网络，请确保路径正确
-      # <certVolumes>
-      # <certKeyVolumes>
+      <certVolumes>
+      <certKeyVolumes>
     command: ["/bin/bash", "/data/entry.sh"]
-    # 新增配置结束
