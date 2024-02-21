@@ -65,7 +65,7 @@ P.S.不需要自己生成https证书，caddy会自动生成。
 mkdir -p ./naive && cd ./naive
 
 # install
-bash <(curl -sSL https://raw.githubusercontent.com/RayWangQvQ/naiveproxy-docker/main/install.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh)
 ```
 
 当不指定参数时，该脚本是互动式的，运行后会提示输入相关配置信息，输入后回车即可。
@@ -81,7 +81,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/RayWangQvQ/naiveproxy-docker/
 mkdir -p ./naive && cd ./naive 
 
 # install
-curl -sSL -f -o ./install.sh https://raw.githubusercontent.com/RayWangQvQ/naiveproxy-docker/main/install.sh && chmod +x ./install.sh && ./install.sh -t demo.test.tk -m zhangsan@qq.com -u zhangsan -p 1qaz@wsx --verbose
+curl -sSL -f -o ./install.sh https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh && chmod +x ./install.sh && ./install.sh -t demo.test.tk -m zhangsan@qq.com -u zhangsan -p 1qaz@wsx --verbose
 ```
 
 ![install-silence](docs/imgs/install-silence.png)
