@@ -532,7 +532,7 @@ runContainer() {
         if [ "$certMode" == "2" ]; then
             certsV="-v $certFile:certFile -v $certKeyFile:$certKeyFile"
         fi
-        docker run -itd --network host --name naiveproxy \
+        docker run -itd --network=my_ipv6_network --name naiveproxy \
         --restart=unless-stopped \
         -p $httpPort:$httpPort \
         -p $httpsPort:$httpsPort \
