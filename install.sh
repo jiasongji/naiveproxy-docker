@@ -534,8 +534,6 @@ runContainer() {
         fi
         docker run -itd --network=host --name naiveproxy \
         --restart=unless-stopped \
-        -p $httpPort:$httpPort \
-        -p $httpsPort:$httpsPort \
         -v $PWD/data:/data \
         -v $PWD/share:/root/.local/share $certsV \
         zai7lou/naiveproxy-docker bash /data/entry.sh
