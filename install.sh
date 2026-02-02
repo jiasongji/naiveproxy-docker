@@ -536,7 +536,7 @@ runContainer() {
         --restart=unless-stopped \
         -v $PWD/data:/data \
         -v $PWD/share:/root/.local/share $certsV \
-        zai7lou/naiveproxy-docker bash /data/entry.sh
+        jiasongji/naiveproxy-docker bash /data/entry.sh
     }
 }
 
