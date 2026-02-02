@@ -65,7 +65,7 @@ jobs:
         id: tags
         run: |
           targetVersion="${{ steps.getTargetVersion.outputs.TargetVersion }}"
-          dockerImage="zai7lou/naiveproxy-docker"
+          dockerImage="jiasongji/naiveproxy-docker"
           ghcrImage="ghcr.io/raywangqvq/naiveproxy-docker"
           dockerTagWithVersion="$dockerImage:$targetVersion"
           ghcrTagWithVersion="$ghcrImage:$targetVersion"
