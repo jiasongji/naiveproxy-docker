@@ -21,7 +21,7 @@
 
 Dockerfile：[Dockerfile](Dockerfile)
 
-DockerHub: [DockerHub](https://hub.docker.com/repository/docker/zai7lou/naiveproxy-docker/general)
+DockerHub: [DockerHub](https://hub.docker.com/repository/docker/jiasongji/naiveproxy-docker/general)
 
 <details>
 <summary>展开查看技术细节，不关心可以跳过</summary>
@@ -90,8 +90,8 @@ curl -sSL -f -o ./install.sh https://raw.githubusercontent.com/jiasongji/naivepr
 
 - `-t`：host，你的域名，如`demo.test.tk`
 - `-o`: cert-mode，证书模式，1为Caddy自动颁发，2为自己指定现有证书
-- `-c`: cert-file，证书文件绝对路径，如`/certs/test2.zai7lou.ml.crt`
-- `-k`, cert-key-file，证书key文件绝对路径，如`/certs/test2.zai7lou.ml.key`
+- `-c`: cert-file，证书文件绝对路径，如`/certs/test2.eu.org.crt`
+- `-k`, cert-key-file，证书key文件绝对路径，如`/certs/test2.eu.org.key`
 - `-m`：mail，你的邮箱，用于自动颁发证书，如`zhangsan@qq.com`
 - `-w`: http-port，http端口，默认80
 - `-s`: https-port，https端口，默认443
