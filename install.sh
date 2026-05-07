@@ -182,7 +182,11 @@ download() {
     local out_path="${2:-}"
 
     if [[ "$remote_path" != "http"* ]]; then
-        cp "$remote_path" "$out_path"
+        if [ -z "$out_path" ]; then
+            cp "$remote_path" .
+        else
+            cp "$remote_path" "$out_path"
+        fi
         return $?
     fi
 
@@ -200,7 +204,7 @@ download() {
             exit 1
         fi
 
-        if [ "$failed" = false ] || [ $attempts -ge 3 ] || { [ ! -z $http_code ] && [ $http_code = "404" ]; }; then
+        if [ "$failed" = false ] || [ $attempts -ge 3 ] || { [ ! -z ${http_code:-} ] && [ "${http_code}" = "404" ]; }; then
             break
         fi
 
@@ -224,7 +228,7 @@ echo ' |  _ < (_| | |_| | | |\  | (_| | | |  \ V /  __/ '
 echo ' |_| \_\__,_|\__, | |_| \_|\__,_| |_|   \_/ \___| '
 echo '             |___/                                '
 
-# ------------vars-----------、
+# ------------vars-----------
 gitRowUrl="https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main"
 
 host=""
@@ -276,7 +280,7 @@ while [ $# -ne 0 ]; do
         shift
         httpPort="$1"
         ;;
-    -s | --http-port | -[Hh]ttp[Pp]ort)
+    -s | --https-port | -[Hh]ttps[Pp]ort)
         shift
         httpsPort="$1"
         ;;
@@ -382,7 +386,7 @@ read_var_from_user() {
 
     # port
     if [ -z "$httpPort" ]; then
-        if [ $certMode == "2" ]; then
+        if [ "$certMode" == "2" ]; then
             say "使用现有证书模式允许使用非80的http端口"
             read -p "请输入Caddy的http端口(如8080, 默认80):" httpPort
             if [ -z "$httpPort" ]; then
@@ -432,7 +436,7 @@ download_docker_compose_file() {
     eval $invocation
 
     rm -rf ./docker-compose.yml
-    download $gitRowUrl/docker-compose.yml docker-compose.yml
+    download "$gitRowUrl/docker-compose.yml" docker-compose.yml
 }
 
 # 配置docker-compose文件
@@ -447,8 +451,15 @@ replace_docker_compose_configs() {
 
     # certs
     if [ "$certMode" == "2" ]; then
-        sed -i 's|<certVolumes>|'-" $certFile":"$certFile"'|g' ./docker-compose.yml
-        sed -i 's|<certKeyVolumes>|'-" $certKeyFile":"$certKeyFile"'|g' ./docker-compose.yml
+        # Ensure certFile and certKeyFile are absolute paths
+        if [[ "$certFile" != /* ]] || [[ "$certKeyFile" != /* ]]; then
+            say_err "证书路径必须为绝对路径，例如 /www/.../fullchain.pem"
+            exit 2
+        fi
+        # Replace placeholders with absolute mappings (host:container)
+        # Here we mount to the same absolute path inside container (minimal change)
+        sed -i "s|<certVolumes>|$certFile:$certFile|g" ./docker-compose.yml
+        sed -i "s|<certKeyVolumes>|$certKeyFile:$certKeyFile|g" ./docker-compose.yml
     else
         sed -i 's|<certVolumes>| |g' ./docker-compose.yml
         sed -i 's|<certKeyVolumes>| |g' ./docker-compose.yml
@@ -466,11 +477,11 @@ download_data_files() {
 
     # entry
     rm -rf ./data/entry.sh
-    download $gitRowUrl/data/entry.sh ./data/entry.sh
+    download "$gitRowUrl/data/entry.sh" ./data/entry.sh
 
     # Caddyfile
     rm -rf ./data/Caddyfile
-    download $gitRowUrl/data/Caddyfile ./data/Caddyfile
+    download "$gitRowUrl/data/Caddyfile" ./data/Caddyfile
 }
 
 # 配置Caddyfile
@@ -479,7 +490,7 @@ replace_caddyfile_configs() {
 
     # debug
     debug=""
-    if [ $verbose = true ]; then
+    if [ "$verbose" = true ]; then
         debug="debug"
     fi
     sed -i 's|<debug>|'"$debug"'|g' ./data/Caddyfile
@@ -530,13 +541,15 @@ runContainer() {
     } || {
         certsV=""
         if [ "$certMode" == "2" ]; then
-            certsV="-v $certFile:certFile -v $certKeyFile:$certKeyFile"
+            # mount certs to same absolute path inside container (minimal change)
+            certsV="-v $certFile:$certFile:ro -v $certKeyFile:$certKeyFile:ro"
         fi
+        # Use quoted expansions to avoid word-splitting issues
         docker run -itd --network=host --name naiveproxy \
         --restart=unless-stopped \
-        -v $PWD/data:/data \
-        -v $PWD/share:/root/.local/share $certsV \
-        jiasongji/naiveproxy-docker bash /data/entry.sh
+        -v "$PWD/data":/data \
+        -v "$PWD/share":/root/.local/share ${certsV} \
+        jiasongji/naiveproxy-docker /bin/bash /data/entry.sh
     }
 }
 
