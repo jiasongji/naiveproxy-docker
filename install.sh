@@ -45,7 +45,7 @@ BT_CERT_BASE="/www/server/panel/vhost/cert"
 BT_SITE_BASE="/www/wwwroot"
 CONTAINER_NAME="naiveproxy"
 IMAGE="jiasongji/naiveproxy-docker"
-FAKE_HOST_DEFAULT="https://soft.xiaoz.org"
+FAKE_HOSTS=("https://demo.cloudreve.org" "https://soft.xiaoz.org")
 
 # ------------ 运行时变量 ------------
 cfg_host=""
@@ -95,7 +95,8 @@ find_bt_fake_host() {
     if [ ${#candidates[@]} -gt 0 ]; then
         echo "${candidates[0]}"
     else
-        echo "$FAKE_HOST_DEFAULT"
+        local idx=$(( RANDOM % ${#FAKE_HOSTS[@]} ))
+        echo "${FAKE_HOSTS[$idx]}"
     fi
 }
 
@@ -509,7 +510,7 @@ do_install() {
     if [ -z "${cfg_fake_host:-}" ] && is_bt; then
         default_fake=$(find_bt_fake_host "$cfg_host")
     else
-        default_fake="${cfg_fake_host:-$FAKE_HOST_DEFAULT}"
+        default_fake="${cfg_fake_host:-${FAKE_HOSTS[$(( RANDOM % ${#FAKE_HOSTS[@]} ))]}}"
     fi
     if [ -z "${cfg_fake_host:-}" ]; then
         read -rp "  伪装站点 [$default_fake]: " cfg_fake_host

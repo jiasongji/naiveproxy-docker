@@ -1,207 +1,348 @@
-# naiveproxy-docker
+# NaiveProxy Docker
 
-基于docker的naiveproxy。
+> 基于 Docker 的 NaiveProxy 一键部署方案，支持宝塔面板深度集成
 
-<!-- TOC depthFrom:2 -->
+基于 [jiasongji/naiveproxy-docker](https://hub.docker.com/r/jiasongji/naiveproxy-docker) 镜像，内建 Caddy + forward_proxy 插件。
 
-- [1. 说明](#1-说明)
-- [2. 预备工作](#2-预备工作)
-- [3. 部署服务端](#3-部署服务端)
-- [4. 客户端](#4-客户端)
-- [5. 自定义配置](#5-自定义配置)
-- [6. 版本变更](#6-版本变更)
-- [7. 常见问题](#7-常见问题)
-    - [7.1. 端口可以自定义吗](#71-端口可以自定义吗)
+## 目录
 
-<!-- /TOC -->
+- [功能特性](#功能特性)
+- [工作原理](#工作原理)
+- [前置要求](#前置要求)
+- [快速开始](#快速开始)
+  - [交互式部署](#交互式部署)
+  - [非交互式部署](#非交互式部署)
+  - [使用宝塔面板证书](#使用宝塔面板证书)
+- [管理命令](#管理命令)
+  - [修改配置](#修改配置)
+  - [更新镜像](#更新镜像)
+  - [查看日志](#查看日志)
+  - [卸载](#卸载)
+- [参数说明](#参数说明)
+- [客户端连接](#客户端连接)
+- [自定义 Caddyfile](#自定义-caddyfile)
+- [常见问题](#常见问题)
+- [版本历史](#版本历史)
 
-## 1. 说明
+---
 
-镜像使用官方代码生成，利用`GitHub Actions`构建并上传到`DockerHub`。
+## 功能特性
 
-Dockerfile：[Dockerfile](Dockerfile)
+- **三种模式**：部署 / 修改配置 / 卸载
+- **宝塔集成**：自动检测宝塔面板证书和站点目录
+- **智能默认值**：所有配置项均可回车使用默认值
+  - 安装目录：`/www/wwwroot/<域名>/naiveproxy`（宝塔环境）
+  - 证书：自动定位 `/www/server/panel/vhost/cert/<域名>/`
+  - 用户名/密码：随机生成
+  - 伪装站：从候选列表中随机选择，或自动检测宝塔站点
+- **热修改**：在线修改端口、账号、密码、反代地址，改完即生效
+- **一键卸载**：清理容器和数据目录
 
-DockerHub: [DockerHub](https://hub.docker.com/repository/docker/jiasongji/naiveproxy-docker/general)
+## 工作原理
 
-<details>
-<summary>展开查看技术细节，不关心可以跳过</summary>
+NaiveProxy 由客户端和服务端组成，本项目部署的是服务端。
 
-- 关于镜像是怎么打的
+服务端本质是带 [forward_proxy](https://github.com/klzgrad/forwardproxy) 插件的 Caddy。当请求到达时：
 
-镜像先是基于go的官方镜像，安装xcaddy，然后使用xcaddy编译naiveproxy插件版的caddy。然后将caddy拷贝到debian镜像中，最后发布这个debian镜像。
+1. **认证通过** → 走代理隧道，实现科学上网
+2. **认证失败 / 无认证** → `probe_resistance` 静默丢弃请求，转发到伪装站点
 
-这样打出来的镜像只有65M，如果不使用docker而是直接在机器上装（go + xcaddy），要1G+。
-
-- 关于naiveproxy到底是什么
-
-naiveproxy有客户端和服务端，这里讲的是我们部署的服务端。
-
-naiveproxy服务端其实就是naiveproxy插件版caddy。
-
-naiveproxy插件版caddy指的是[https://github.com/klzgrad/forwardproxy](https://github.com/klzgrad/forwardproxy)。作者通过fork原版caddy，自己实现了`forward_proxy`功能，这个就是naiveproxy代理了。
-
-- 关于伪装
-
-`forward_proxy`里有个`probe_resistance`指令，我们请求会先进`forward_proxy`，如果用户名密码正确，则会正常实现naiveproxy代理功能；但如果认证失败，`probe_resistance`表明不会有异常产生，而是将当前请求继续往下仍，也就是扔到我们的伪装站点（可以是反代的站点也可以是本地的文件服务）。
-
-所以就实现了我们客户端（能提供正确的用户名和密码）去访问就是naiveproxy代理，但其他人用户浏览器访问（或认证不通过），看到的就是一个正常站点。
-
-</details>
-
-## 2. 预备工作
-
-- 一个域名
-- 域名已DNS到当前服务器ip
-- 服务器已安装好docker环境
-
-P.S.不需要自己生成https证书，caddy会自动生成。
-
-## 3. 部署服务端
-
-一键安装脚本：
+效果：浏览器访问看到的是一个正常网站，只有客户端才知道它是代理。
 
 ```
-# create a dir
-mkdir -p ./naive && cd ./naive
+客户端请求 ──→ Caddy (NaiveProxy)
+                ├─ 认证通过 → 代理隧道 → 目标网站
+                └─ 无认证   → 伪装站点（看起来是普通网站）
+```
 
-# install
+## 前置要求
+
+| 要求 | 说明 |
+|------|------|
+| 域名 | 已解析到服务器 IP |
+| Docker | 已安装 Docker 和 Docker Compose |
+| 端口 | 如果自备证书，HTTPS 端口需开放；如果自动申请证书，80 和 443 端口需开放 |
+| 证书（可选） | 如有宝塔面板或已持有 SSL 证书可直接使用；否则 Caddy 可自动申请 |
+
+---
+
+## 快速开始
+
+### 交互式部署
+
+最简单的方式——运行脚本，按提示输入（直接回车使用默认值）：
+
+```bash
 bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh)
 ```
 
-当不指定参数时，该脚本是互动式的，运行后会提示输入相关配置信息，输入后回车即可。
-
-![install-interaction](docs/imgs/install-interaction.png)
-
-![install-interaction-re](docs/imgs/insatll-interaction-re.png)
-
-当然，你也可以像下面那样，直接将参数拼接好后立即执行：
+脚本会依次询问：
 
 ```
-# create a dir
-mkdir -p ./naive && cd ./naive 
-
-# install
-curl -sSL -f -o ./install.sh https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh && chmod +x ./install.sh && ./install.sh -t demo.test.tk -m zhangsan@qq.com -u zhangsan -p 1qaz@wsx --verbose
+  请输入绑定域名: proxy.example.com
+  安装目录 [/www/wwwroot/proxy.example.com/naiveproxy]: ← 回车
+  证书文件 [/www/server/panel/vhost/cert/proxy.example.com/fullchain.pem]: ← 回车
+  私钥文件 [/www/server/panel/vhost/cert/proxy.example.com/privkey.pem]: ← 回车
+  HTTP 端口 [80]: ← 回车
+  HTTPS 端口 [443]: ← 回车
+  代理用户名 [npa3x9fk]: ← 回车（或输入自定义用户名）
+  代理密码 [R4m8kX2pN9vL3qH7]: ← 回车（或输入自定义密码）
+  伪装站点 [https://demo.cloudreve.org]: ← 回车
 ```
 
-![install-silence](docs/imgs/install-silence.png)
-
-参数说明：
-
-- `-t`：host，你的域名，如`demo.test.tk`
-- `-o`: cert-mode，证书模式，1为Caddy自动颁发，2为自己指定现有证书
-- `-c`: cert-file，证书文件绝对路径，如`/certs/test2.eu.org.crt`
-- `-k`, cert-key-file，证书key文件绝对路径，如`/certs/test2.eu.org.key`
-- `-m`：mail，你的邮箱，用于自动颁发证书，如`zhangsan@qq.com`
-- `-w`: http-port，http端口，默认80
-- `-s`: https-port，https端口，默认443
-- `-u`：user，proxy的用户名
-- `-p`：pwd，proxy的密码
-- `-f`：fakeHost，伪装域名，默认`https://demo.cloudreve.org`
-- `--verbose`，输出详细日志
-- `-h`：help，查看参数信息
-
-容器run成功后，可以通过以下语句查看容器运行日志：
+部署完成后会输出客户端连接信息：
 
 ```
+  ✓ 容器启动成功！
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    部署完成
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    客户端连接信息:
+      naive+https://npa3x9fk:R4m8kX2pN9vL3qH7@proxy.example.com:443#naive
+```
+
+### 非交互式部署
+
+通过命令行参数指定全部配置，加上 `--yes` 跳过确认，适合脚本化部署：
+
+```bash
+curl -sSL -o ./install.sh https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh \
+&& chmod +x ./install.sh \
+&& ./install.sh \
+  -t proxy.example.com \
+  -u myuser \
+  -p MyPassword123 \
+  --yes
+```
+
+> 不指定证书路径时，脚本会自动检测宝塔证书目录，或提示手动输入。
+
+### 使用宝塔面板证书
+
+如果你的服务器安装了宝塔面板，且已在面板中为域名申请了 SSL 证书，直接运行即可——脚本会自动检测证书路径：
+
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh)
+```
+
+也可以显式指定证书路径：
+
+```bash
+./install.sh \
+  -t proxy.example.com \
+  -c /www/server/panel/vhost/cert/proxy.example.com/fullchain.pem \
+  -k /www/server/panel/vhost/cert/proxy.example.com/privkey.pem \
+  -w 80 -s 443 \
+  -u myuser -p MyPassword123 \
+  -d /www/wwwroot/proxy.example.com/naiveproxy \
+  --yes
+```
+
+---
+
+## 管理命令
+
+### 修改配置
+
+交互式修改端口、用户名、密码、伪装站点，改完自动重启生效：
+
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh) --modify
+```
+
+运行效果：
+
+```
+  当前配置:
+    域名:       proxy.example.com
+    HTTPS 端口: 443
+    用户名:     myuser
+    密码:       MyPassword123
+    伪装站:     https://demo.cloudreve.org
+
+  直接回车保持当前值，输入新值则修改
+
+  HTTPS 端口 [443]: 8443
+  用户名 [myuser]:
+  密码 [MyPassword123]: NewPass456
+  伪装站点 [https://demo.cloudreve.org]:
+
+  ✓ 配置已更新并生效
+```
+
+### 更新镜像
+
+```bash
+cd /www/wwwroot/proxy.example.com/naiveproxy \
+&& docker compose pull \
+&& docker compose up -d
+```
+
+### 查看日志
+
+```bash
+# 实时跟踪
 docker logs -f naiveproxy
+
+# 查看最近 100 行
+docker logs --tail=100 naiveproxy
 ```
 
-`Ctrl + C` 可以退出日志追踪。
+### 卸载
 
+完全移除容器和数据：
 
-如果是第一次运行且选择自动颁发证书模式，颁发证书时日志可能会先ERROR飘红，别慌，等一会。
-
-如果最后日志出现`certificate obtained successfully`字样，就是颁发成功了，可以去部署客户端了。
-
-![success](docs/imgs/cert-suc.png)
-
-如果颁发证书一直不成功，请检查80端口是否被占用。
-
-部署成功后，浏览器访问域名，会展示伪装站点：
-
-![web](docs/imgs/web.png)
-
-## 4. 客户端
-
-很多教程，就不说了。
-
-|  平台   | 客户端  |
-| :----:  | :----: |
-|  Win    | V2RayN/Nekoray |
-| Linux   | Nekoray |
-| MacOS   | Nekoray |
-| Android | SagerNet |
-| iOS     | Shadowrocket |
-
-## 5. 自定义配置
-
-Caddy的配置文件`Caddyfile`已被挂载到宿主机的[./data/Caddyfile](data/Caddyfile)，想要自定义配置，比如：
-
-- 添加proxy多用户
-- 修改proxy的用户名和密码
-- 更改端口
-- 修改伪装站点的host
-
-等等，都可以直接在宿主机修改该文件：
-
-```
-vim ./data/Caddyfile
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh) --uninstall
 ```
 
-修改完成并保存成功后，让Caddy热加载配置就可以了：
+---
+
+## 参数说明
 
 ```
-docker exec -it naiveproxy /app/caddy reload --config /data/Caddyfile
+./install.sh [选项]
+
+部署选项:
+  -t, --host <HOST>            绑定域名
+  -w, --http-port <PORT>       HTTP 端口 (默认 80)
+  -s, --https-port <PORT>      HTTPS 端口 (默认 443)
+  -u, --user <USER>            代理用户名 (默认自动生成)
+  -p, --pwd <PASS>             代理密码 (默认自动生成)
+  -f, --fake-host <URL>        伪装站点 (默认自动检测)
+  -c, --cert-file <PATH>       证书文件路径 (默认宝塔证书)
+  -k, --cert-key <PATH>        私钥文件路径 (默认宝塔证书)
+  -d, --install-dir <DIR>      安装目录 (默认 /www/wwwroot/<域名>/naiveproxy)
+  -y, --yes                    跳过确认
+  -v, --verbose                调试模式
+  -h, --help                   显示帮助
+
+管理模式:
+  --modify                     修改已有配置
+  --uninstall                  卸载并清理
 ```
 
-举个栗子，多用户可以直接添加`forward_proxy`，像这样：
+---
+
+## 客户端连接
+
+部署完成后，使用输出的连接信息在客户端配置：
+
+```
+naive+https://用户名:密码@域名:HTTPS端口#naive
+```
+
+### 支持的客户端
+
+| 平台 | 客户端 |
+|:----:|:------:|
+| Windows | V2RayN / NekoRay |
+| Linux | NekoRay |
+| macOS | NekoRay |
+| Android | SagerNet / NekoBox |
+| iOS | Shadowrocket |
+
+以 V2RayN 为例：
+
+1. 服务器 → 添加 [NaiveProxy] 服务器
+2. 填入地址（域名）、端口、用户名、密码
+3. 网络传输协议选择 `naive`
+4. 连接测试
+
+---
+
+## 自定义 Caddyfile
+
+Caddyfile 位于安装目录下的 `data/Caddyfile`，可直接编辑：
+
+```bash
+vim /www/wwwroot/proxy.example.com/naiveproxy/data/Caddyfile
+```
+
+修改后重载配置：
+
+```bash
+docker exec naiveproxy /app/caddy reload --config /data/Caddyfile
+```
+
+### 多用户示例
+
+添加多个 `forward_proxy` 块实现多用户：
 
 ```
 {
-	debug
 	http_port 80
 	https_port 443
+	auto_https off
 	order forward_proxy before file_server
 }
-:443, demo.test.tk {
-	tls zhangsan@qq.com
+:443, proxy.example.com {
+	tls /path/to/fullchain.pem /path/to/privkey.pem
 	route {
-		# proxy
 		forward_proxy {
-			basic_auth zhangsan 1qaz@wsx
+			basic_auth user1 password1
 			hide_ip
 			hide_via
 			probe_resistance
 		}
 		forward_proxy {
-			basic_auth lisi 1234
+			basic_auth user2 password2
 			hide_ip
 			hide_via
 			probe_resistance
 		}
 
-		# 伪装网址
-		reverse_proxy you.want.com {
+		reverse_proxy https://demo.cloudreve.org {
 			header_up Host {upstream_hostport}
 		}
 	}
 }
 ```
 
-详细的配置语法可以参考Caddy的官方文档：[Caddy Doc](https://caddyserver.com/docs/)
+> ⚠️ 注意：不要使用 `caddy fmt --overwrite` 格式化 Caddyfile，它会截断 `basic_auth` 中的密码字段。
 
-P.S.我发现naiveproxy插件版地caddy，Caddyfile里不支持`demo.test.tk:443`的格式，必须像上面那样端口在域名前面，否则会报错。应该是适配有问题，需要注意下。
+> ⚠️ 注意：端口必须写在域名前面，即 `:443, proxy.example.com`，反过来会报错。
 
-## 6. 版本变更
+---
 
-[CHANGELOG](CHANGELOG.md)
+## 常见问题
 
-## 7. 常见问题
-### 7.1. 端口可以自定义吗
+### 部署后浏览器访问域名看不到伪装站点？
 
-如果使用现有证书，可以自定义；如果要Caddy自动颁发，必须占有80端口。
+检查 HTTPS 端口是否在防火墙/安全组中放行。
 
-Caddy默认会占用80和443端口，用来管理证书，当前官方镜像并不支持更改默认端口，也就是一定需要占用80端口。
+### 自动申请证书失败？
 
-安装脚本可以选择证书模式，选择2使用现有证书，就可以不占用80和443端口了。
+自动申请需要 80 端口开放且未被占用。检查：
+1. 80 端口是否被 Nginx/Apache 占用：`ss -tlnp | grep :80`
+2. 域名是否正确解析到服务器 IP：`dig your-domain.com`
+
+如果 80 端口被占用，建议在宝塔面板申请证书后使用「使用现有证书」模式。
+
+### 如何更换端口？
+
+使用修改模式：
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh) --modify
+```
+输入新的 HTTPS 端口，回车跳过其他选项即可。
+
+### 容器启动后日志报 ACME 错误？
+
+这是 Caddy 尝试自动获取证书。如果你已经使用了自有证书，可以忽略——脚本已设置 `auto_https off` 来禁用此行为。
+
+---
+
+## 版本历史
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
+
+### v2.0
+
+- 全新交互式管理脚本，支持部署/修改/卸载三种模式
+- 宝塔面板深度集成（自动检测证书、站点目录、伪装站）
+- 所有配置项支持智能默认值（回车即用）
+- 用户名/密码自动生成
+- 修复 `caddy fmt` 截断密码、docker-compose 证书卷格式错误、ACME 无限重试等 BUG
