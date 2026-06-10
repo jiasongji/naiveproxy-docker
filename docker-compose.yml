@@ -6,14 +6,9 @@ services:
     container_name: naiveproxy
     tty: true
     restart: unless-stopped
-    # 以下是旧的网络配置，改为使用宿主网络模式
-    # ports:
-    #   - <httpPort>:<httpPort>
-    #   - <httpsPort>:<httpsPort>
     network_mode: "host"
     volumes:
       - ./data:/data
       - ./share:/root/.local/share
-      <certVolumes>
-      <certKeyVolumes>
+<certVolumes>
     command: ["/bin/bash", "/data/entry.sh"]

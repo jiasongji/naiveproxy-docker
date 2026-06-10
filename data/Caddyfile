@@ -6,11 +6,11 @@
 	order forward_proxy before file_server
 }
 :<httpsPort>, <host> {
-	tls <mail> <cert_file> <cert_key_file>
+	<tlsConfig>
 	route {
 		# proxy
 		forward_proxy {
-			basic_auth <user> <pwd>
+			basic_auth <user> <hashed_pwd>
 			hide_ip
 			hide_via
 			probe_resistance

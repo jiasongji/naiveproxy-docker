@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e
 
-echo "Formate the Caddyfile"
-/app/caddy fmt --overwrite /data/Caddyfile
+# DO NOT format the Caddyfile with caddy fmt --overwrite
+# because it corrupts the bcrypt hash in basic_auth.
+# The Caddyfile is already pre-formatted by install.sh.
 
 echo "Start server"
 /app/caddy start --config /data/Caddyfile
