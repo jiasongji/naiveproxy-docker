@@ -70,8 +70,8 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
   私钥文件 [/www/server/panel/vhost/cert/proxy.example.com/privkey.pem]: ← 回车
   HTTPS 端口 [38291]: ← 回车（随机高位端口）
   HTTP 端口 [38290]: ← 回车
-  代理用户名 [np482716]: ← 回车（随机生成）
-  代理密码 [Kx9mBp3vN7wL2qH5]: ← 回车（随机生成）
+  代理用户名 [np××××]: ← 回车（随机生成）
+  代理密码 [××××]: ← 回车（随机生成）
   伪装站点 [https://demo.cloudreve.org]: ← 回车（随机选择）
 ```
 
@@ -85,7 +85,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     客户端连接信息:
-      naive+https://np482716:Kx9mBp3vN7wL2qH5@proxy.example.com:38291#naive
+      naive+https://<用户名>:<密码>@proxy.example.com:38291#naive
 ```
 
 ### 非交互式部署
@@ -112,7 +112,7 @@ curl -sSL -o ./install.sh https://raw.githubusercontent.com/jiasongji/naiveproxy
   -c /www/server/panel/vhost/cert/proxy.example.com/fullchain.pem \
   -k /www/server/panel/vhost/cert/proxy.example.com/privkey.pem \
   -w 80 -s 443 \
-  -u myuser -p MyPassword123 \
+  -u <用户名> -p <密码> \
   -f https://demo.cloudreve.org \
   -d /www/wwwroot/proxy.example.com/naiveproxy \
   --yes
@@ -143,15 +143,15 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
 ```
   当前配置:
     HTTPS 端口: 38291
-    用户名:     np482716
-    密码:       Kx9mBp3vN7wL2qH5
+    用户名:     np××××
+    密码:       ××××
     伪装站:     https://demo.cloudreve.org
 
   直接回车保持当前值，输入新值则修改
 
   HTTPS 端口 [38291]:
-  用户名 [np482716]: newuser
-  密码 [Kx9mBp3vN7wL2qH5]: NewPass456
+  用户名 [np××××]: <输入新用户名或回车跳过>
+  密码 [××××]: <输入新密码或回车跳过>
   伪装站点 [https://demo.cloudreve.org]:
 
   ✓ 配置已更新并生效
@@ -192,8 +192,8 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
   -t, --host <HOST>            绑定域名（必填）
   -w, --http-port <PORT>       HTTP 端口（默认随机高位端口）
   -s, --https-port <PORT>      HTTPS 端口（默认随机高位端口）
-  -u, --user <USER>            代理用户名（默认自动生成，如 np482716）
-  -p, --pwd <PASS>             代理密码（默认自动生成，16位随机字符）
+  -u, --user <USER>            代理用户名（默认自动生成）
+  -p, --pwd <PASS>             代理密码（默认自动生成）
   -f, --fake-host <URL>        伪装站点（随机选择）
   -c, --cert-file <PATH>       证书文件路径（默认宝塔证书）
   -k, --cert-key <PATH>        私钥文件路径（默认宝塔证书）
@@ -214,7 +214,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
 部署完成后，使用输出的连接信息在客户端配置：
 
 ```
-naive+https://用户名:密码@域名:HTTPS端口#naive
+naive+https://<用户名>:<密码>@<域名>:<HTTPS端口>#naive
 ```
 
 ### 支持的客户端
@@ -250,11 +250,11 @@ docker exec naiveproxy /app/caddy reload --config /data/Caddyfile
 	tls /path/to/fullchain.pem /path/to/privkey.pem
 	route {
 		forward_proxy {
-			basic_auth user1 password1
+			basic_auth <用户1> <密码1>
 			hide_ip hide_via probe_resistance
 		}
 		forward_proxy {
-			basic_auth user2 password2
+			basic_auth <用户2> <密码2>
 			hide_ip hide_via probe_resistance
 		}
 		reverse_proxy https://demo.cloudreve.org {
@@ -299,7 +299,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
 ### v2.1
 
 - 默认端口改为随机高位端口（20000-60000），避免与常用服务冲突
-- 用户名格式规范化：`np` + 6位数字（如 `np482716`）
+- 用户名格式规范化：`np` + 6位随机数字
 - 密码默认 16 位随机字母数字
 - 伪装站点从候选列表随机选择
 - 恢复 `caddy fmt` 格式化（经测试不会截断密码）
