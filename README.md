@@ -3,7 +3,6 @@
 > 基于 Docker 的 NaiveProxy 一键部署方案，支持宝塔面板集成
 
 [![Docker](https://img.shields.io/docker/v/jiasongji/naiveproxy-docker?label=Docker%20Hub)](https://hub.docker.com/r/jiasongji/naiveproxy-docker)
-[![License](https://img.shields.io/github/license/jiasongji/naiveproxy-docker)](LICENSE)
 
 ## 目录
 
@@ -11,25 +10,27 @@
 - [工作原理](#工作原理)
 - [前置要求](#前置要求)
 - [快速开始](#快速开始)
-  - [一键交互式部署](#一键交互式部署)
+  - [交互式部署（推荐）](#交互式部署推荐)
   - [非交互式部署](#非交互式部署)
-  - [使用宝塔面板证书](#使用宝塔面板证书)
 - [管理命令](#管理命令)
+  - [修改配置](#修改配置)
+  - [更新镜像](#更新镜像)
+  - [查看日志](#查看日志)
+  - [卸载](#卸载)
 - [参数说明](#参数说明)
 - [客户端连接](#客户端连接)
 - [自定义 Caddyfile](#自定义-caddyfile)
 - [常见问题](#常见问题)
-- [版本历史](#版本历史)
 
 ---
 
 ## 功能特性
 
-- **一键部署** — 运行脚本，全部配置回车即用默认值
-- **智能默认值** — 自动检测宝塔证书、随机生成高位端口/用户名/密码/伪装站
+- **一键部署** — 运行脚本，全部配置回车即用默认值，脚本自动创建目录并生成配置
+- **智能默认值** — 自动检测宝塔证书、随机生成高位端口 / 用户名 / 密码 / 伪装站
 - **热修改** — 在线修改端口、账号、密码、反代地址，改完即生效
 - **一键卸载** — 清理容器和数据目录
-- **宝塔集成** — 自动检测证书路径、站点目录
+- **宝塔集成** — 自动检测证书路径和站点目录
 
 ## 工作原理
 
@@ -37,7 +38,7 @@ NaiveProxy 由客户端和服务端组成，本项目部署的是服务端。
 
 服务端本质是带 [forward_proxy](https://github.com/klzgrad/forwardproxy) 插件的 Caddy。当请求到达时：
 
-- **认证通过** → 走代理隧道，实现科学上网
+- **认证通过** → 走代理隧道
 - **无认证** → `probe_resistance` 静默将请求转发到伪装站点
 
 效果：浏览器访问看到的是一个正常网站，只有持有正确凭证的客户端才能使用代理。
@@ -48,14 +49,14 @@ NaiveProxy 由客户端和服务端组成，本项目部署的是服务端。
 |------|------|
 | 域名 | 已解析到服务器 IP |
 | Docker | 已安装 Docker 和 Docker Compose |
-| SSL 证书 | 可使用宝塔面板证书，或自行提供；脚本默认使用宝塔证书 |
-| 开放端口 | HTTPS 端口需在防火墙/安全组放行 |
+| SSL 证书 | 推荐使用宝塔面板管理证书；脚本自动检测宝塔证书目录 |
+| 开放端口 | HTTPS 端口需在防火墙 / 安全组放行 |
 
 ---
 
 ## 快速开始
 
-### 一键交互式部署
+### 交互式部署（推荐）
 
 ```bash
 bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh)
@@ -65,15 +66,17 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
 
 ```
   请输入绑定域名: proxy.example.com
-  安装目录 [/www/wwwroot/proxy.example.com/naiveproxy]: ← 回车
-  证书文件 [/www/server/panel/vhost/cert/proxy.example.com/fullchain.pem]: ← 回车
-  私钥文件 [/www/server/panel/vhost/cert/proxy.example.com/privkey.pem]: ← 回车
-  HTTPS 端口 [38291]: ← 回车（随机高位端口）
-  HTTP 端口 [38290]: ← 回车
-  代理用户名 [np××××]: ← 回车（随机生成）
-  代理密码 [××××]: ← 回车（随机生成）
-  伪装站点 [https://demo.cloudreve.org]: ← 回车（随机选择）
+  安装目录 [/www/wwwroot/proxy.example.com/naiveproxy]:          ← 回车
+  证书文件 [/www/.../fullchain.pem]:                              ← 回车（宝塔自动检测）
+  私钥文件 [/www/.../privkey.pem]:                                ← 回车
+  HTTPS 端口 [38291]:                                            ← 回车（随机高位端口）
+  HTTP 端口 [38290]:                                             ← 回车
+  代理用户名 [np******]:                                          ← 回车（随机生成）
+  代理密码 [****************]:                                    ← 回车（随机生成）
+  伪装站点 [https://demo.cloudreve.org]:                          ← 回车（随机选择）
 ```
+
+> 脚本会自动创建安装目录、生成配置文件、拉取镜像并启动容器，无需手动准备任何文件。
 
 部署完成后输出连接信息：
 
@@ -90,24 +93,26 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
 
 ### 非交互式部署
 
-通过命令行参数指定配置，`--yes` 跳过确认。**至少需要指定域名和证书**，其余均有默认值：
+通过命令行参数指定配置，`--yes` 跳过确认。**至少需要指定域名和证书**，其余均有默认值（自动随机生成高位端口、用户名、密码、伪装站）：
 
 ```bash
-curl -sSL -o ./install.sh https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh \
-&& chmod +x ./install.sh \
-&& ./install.sh \
+curl -sSL -o /tmp/naive-install.sh https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh \
+&& chmod +x /tmp/naive-install.sh \
+&& /tmp/naive-install.sh \
   -t proxy.example.com \
   -c /www/server/panel/vhost/cert/proxy.example.com/fullchain.pem \
   -k /www/server/panel/vhost/cert/proxy.example.com/privkey.pem \
   --yes
 ```
 
-上面的命令只指定了域名和证书，端口/用户名/密码/伪装站全部自动生成。
+> 脚本自动创建安装目录（默认 `/www/wwwroot/<域名>/naiveproxy`），无需手动 `mkdir`。
 
 也可以指定全部参数：
 
 ```bash
-./install.sh \
+curl -sSL -o /tmp/naive-install.sh https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh \
+&& chmod +x /tmp/naive-install.sh \
+&& /tmp/naive-install.sh \
   -t proxy.example.com \
   -c /www/server/panel/vhost/cert/proxy.example.com/fullchain.pem \
   -k /www/server/panel/vhost/cert/proxy.example.com/privkey.pem \
@@ -118,19 +123,11 @@ curl -sSL -o ./install.sh https://raw.githubusercontent.com/jiasongji/naiveproxy
   --yes
 ```
 
-### 使用宝塔面板证书
-
-如果服务器安装了宝塔面板，且已在面板中为域名申请了 SSL 证书，直接运行即可——脚本会自动检测证书路径：
-
-```bash
-bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh)
-```
-
-脚本会列出宝塔已有证书的域名供参考。
-
 ---
 
 ## 管理命令
+
+> 以下命令中的 `/www/wwwroot/proxy.example.com/naiveproxy` 为安装目录示例，请替换为实际路径。
 
 ### 修改配置
 
@@ -140,19 +137,19 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
 bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh) --modify
 ```
 
+运行后显示当前配置，直接回车保持不变，输入新值则修改：
+
 ```
   当前配置:
     HTTPS 端口: 38291
-    用户名:     np××××
-    密码:       ××××
+    用户名:     ...
+    密码:       ...
     伪装站:     https://demo.cloudreve.org
 
-  直接回车保持当前值，输入新值则修改
-
-  HTTPS 端口 [38291]:
-  用户名 [np××××]: <输入新用户名或回车跳过>
-  密码 [××××]: <输入新密码或回车跳过>
-  伪装站点 [https://demo.cloudreve.org]:
+  HTTPS 端口 [38291]:              ← 回车保持，或输入新端口
+  用户名 [...]:                    ← 回车保持，或输入新用户名
+  密码 [...]:                      ← 回车保持，或输入新密码
+  伪装站点 [...]:                  ← 回车保持，或输入新地址
 
   ✓ 配置已更新并生效
 ```
@@ -177,6 +174,8 @@ docker logs --tail=100 naiveproxy
 
 ### 卸载
 
+完全移除容器和数据目录：
+
 ```bash
 bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/main/install.sh) --uninstall
 ```
@@ -198,7 +197,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
   -c, --cert-file <PATH>       证书文件路径（默认宝塔证书）
   -k, --cert-key <PATH>        私钥文件路径（默认宝塔证书）
   -d, --install-dir <DIR>      安装目录（默认 /www/wwwroot/<域名>/naiveproxy）
-  -y, --yes                    跳过确认
+  -y, --yes                    跳过确认，未提供的参数使用默认值
   -v, --verbose                调试模式
   -h, --help                   显示帮助
 
@@ -211,7 +210,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
 
 ## 客户端连接
 
-部署完成后，使用输出的连接信息在客户端配置：
+部署完成后，使用脚本输出的连接信息在客户端配置：
 
 ```
 naive+https://<用户名>:<密码>@<域名>:<HTTPS端口>#naive
@@ -245,8 +244,10 @@ docker exec naiveproxy /app/caddy reload --config /data/Caddyfile
 
 ### 多用户示例
 
+添加多个 `forward_proxy` 块实现多用户：
+
 ```
-:38291, proxy.example.com {
+:443, proxy.example.com {
 	tls /path/to/fullchain.pem /path/to/privkey.pem
 	route {
 		forward_proxy {
@@ -272,11 +273,11 @@ docker exec naiveproxy /app/caddy reload --config /data/Caddyfile
 
 ### 浏览器访问域名看不到伪装站点？
 
-HTTPS 端口需要在防火墙/安全组中放行。
+HTTPS 端口需要在防火墙 / 安全组中放行。
 
 ### 自动申请证书失败？
 
-自动申请需要 80 端口开放且未被占用。如果 80 端口被 Nginx 等占用，建议在宝塔面板申请证书后使用「现有证书」模式。
+自动申请需要 80 端口开放且未被占用。如果 80 端口被 Nginx 等占用，建议在宝塔面板申请证书后使用现有证书模式。
 
 ### 如何更换端口？
 
@@ -289,25 +290,3 @@ bash <(curl -sSL https://raw.githubusercontent.com/jiasongji/naiveproxy-docker/m
 ### 容器日志报 ACME 错误？
 
 脚本已设置 `auto_https off` 禁止 Caddy 自动获取证书。如果仍有报错，不影响代理功能，可以忽略。
-
----
-
-## 版本历史
-
-详见 [CHANGELOG.md](CHANGELOG.md)。
-
-### v2.1
-
-- 默认端口改为随机高位端口（20000-60000），避免与常用服务冲突
-- 用户名格式规范化：`np` + 6位随机数字
-- 密码默认 16 位随机字母数字
-- 伪装站点从候选列表随机选择
-- 恢复 `caddy fmt` 格式化（经测试不会截断密码）
-- 移除 docker-compose `version` 字段（新版 Docker 不再需要）
-- 非交互式模式下只需指定域名和证书即可完成部署
-
-### v2.0
-
-- 全新交互式管理脚本，支持部署/修改/卸载三种模式
-- 宝塔面板集成、智能默认值
-- 修复 docker-compose 证书卷格式、ACME 无限重试等问题
